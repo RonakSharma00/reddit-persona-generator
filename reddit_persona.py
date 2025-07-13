@@ -8,11 +8,9 @@ from typing import List, Dict, Tuple
 
 class RedditPersonaGenerator:
     def __init__(self):
-        # Load configuration from praw.ini
         self.config = configparser.ConfigParser()
         self.config.read('praw.ini')
-        
-        # Initialize Reddit instance
+
         self.reddit = praw.Reddit(
             client_id=self.config['REDDIT']['client_id'],
             client_secret=self.config['REDDIT']['client_secret'],
@@ -24,7 +22,6 @@ class RedditPersonaGenerator:
         user = self.reddit.redditor(username)
         
         try:
-            # Basic user info
             user_info = {
                 'username': username,
                 'created_utc': datetime.datetime.fromtimestamp(user.created_utc).strftime('%Y-%m-%d'),
@@ -35,8 +32,6 @@ class RedditPersonaGenerator:
                 'comments': [],
                 'posts': []
             }
-            
-            # Get recent comments (limit to 100 for practicality)
             for comment in user.comments.new(limit=100):
                 user_info['comments'].append({
                     'body': comment.body,
@@ -82,19 +77,16 @@ class RedditPersonaGenerator:
             'language_style': defaultdict(int)
         }
         
-        # Analyze comments
         for comment in user_info['comments']:
             self._analyze_comment(comment, persona)
             persona['frequent_subreddits'][comment['subreddit']] += 1
             self._analyze_activity_time(comment['created_utc'], persona)
             
-        # Analyze posts
         for post in user_info['posts']:
             self._analyze_post(post, persona)
             persona['frequent_subreddits'][post['subreddit']] += 1
             self._analyze_activity_time(post['created_utc'], persona)
             
-        # Process findings
         persona['top_interests'] = sorted(
             persona['interests'].items(), 
             key=lambda x: len(x[1]), 
@@ -110,7 +102,6 @@ class RedditPersonaGenerator:
         return persona
     
     def _calculate_account_age(self, created_date: str) -> str:
-        """Calculate account age in years/months"""
         created = datetime.datetime.strptime(created_date, '%Y-%m-%d')
         delta = datetime.datetime.now() - created
         years = delta.days // 365
@@ -118,10 +109,8 @@ class RedditPersonaGenerator:
         return f"{years} years, {months} months"
     
     def _analyze_comment(self, comment: Dict, persona: Dict):
-        """Analyze a single comment for persona traits"""
         text = comment['body'].lower()
         
-        # Detect interests
         if any(tech in text for tech in ['python', 'javascript', 'java', 'c++']):
             persona['interests']['programming'].append(comment['permalink'])
         if any(word in text for word in ['game', 'gaming', 'playstation', 'xbox']):
@@ -129,7 +118,6 @@ class RedditPersonaGenerator:
         if any(word in text for word in ['movie', 'film', 'netflix', 'hbo']):
             persona['interests']['movies'].append(comment['permalink'])
         
-        # Detect personality traits
         if any(word in text for word in ['i think', 'in my opinion']):
             persona['personality_traits']['opinionated'].append(comment['permalink'])
         if '?' in text:
@@ -137,7 +125,6 @@ class RedditPersonaGenerator:
         if any(word in text for word in ['thanks', 'thank you', 'appreciate']):
             persona['personality_traits']['polite'].append(comment['permalink'])
             
-        # Analyze language style
         persona['language_style']['comment_length'] += len(text.split())
         if '!' in text:
             persona['language_style']['exclamation_use'] += 1
@@ -148,7 +135,6 @@ class RedditPersonaGenerator:
         """Analyze a single post for persona traits"""
         text = (post['title'] + ' ' + post.get('selftext', '')).lower()
         
-        # Detect interests from posts
         if any(word in text for word in ['help', 'advice', 'suggestion']):
             persona['interests']['help_seeking'].append(post['permalink'])
         if any(word in text for word in ['discussion', 'debate', 'opinion']):
@@ -175,13 +161,11 @@ class RedditPersonaGenerator:
         with open(filename, 'w', encoding='utf-8') as f:
             f.write("=== REDDIT USER PERSONA ===\n\n")
             
-            # Basic Info
             f.write("== BASIC INFORMATION ==\n")
             for key, value in persona['basic_info'].items():
                 f.write(f"{key}: {value}\n")
             f.write("\n")
             
-            # Top Interests
             f.write("== TOP INTERESTS ==\n")
             for interest, citations in persona['top_interests']:
                 f.write(f"- {interest.capitalize()} (based on {len(citations)} comments/posts)\n")
@@ -189,15 +173,13 @@ class RedditPersonaGenerator:
                     f.write(f"  - Citation: {url}\n")
             f.write("\n")
             
-            # Personality Traits
             f.write("== PERSONALITY TRAITS ==\n")
             for trait, citations in persona['personality_traits'].items():
                 f.write(f"- {trait.capitalize()} (based on {len(citations)} comments/posts)\n")
-                for url in citations[:2]:  # Show top 2 citations
+                for url in citations[:2]:
                     f.write(f"  - Citation: {url}\n")
             f.write("\n")
             
-            # Activity Patterns
             f.write("== ACTIVITY PATTERNS ==\n")
             total_activity = sum(persona['activity_patterns'].values())
             for time, count in persona['activity_patterns'].items():
@@ -205,7 +187,6 @@ class RedditPersonaGenerator:
                 f.write(f"- Most active during {time}: {percentage:.1f}% of activity\n")
             f.write("\n")
             
-            # Language Style
             f.write("== LANGUAGE STYLE ==\n")
             if persona['language_style']['comment_length'] > 0:
                 avg_length = persona['language_style']['comment_length'] / \
@@ -217,7 +198,6 @@ class RedditPersonaGenerator:
                 f.write("- Often uses self-referential language (I, me, my)\n")
             f.write("\n")
             
-            # Frequent Subreddits
             f.write("== FREQUENTLY VISITED SUBREDDITS ==\n")
             for subreddit, count in persona['top_subreddits']:
                 f.write(f"- r/{subreddit}: {count} interactions\n")
@@ -230,7 +210,6 @@ def main():
     
     generator = RedditPersonaGenerator()
     
-    # Get Reddit profile URL from user
     profile_url = input("Enter Reddit profile URL (e.g., https://www.reddit.com/user/username/): ").strip()
     username = profile_url.split('/user/')[-1].strip('/')
     
@@ -240,17 +219,14 @@ def main():
     
     print(f"\nFetching data for user: {username}...")
     
-    # Extract user info
     user_info = generator.extract_user_info(username)
     if not user_info:
         print("Failed to fetch user data. Please check the username and try again.")
         return
     
-    # Analyze and generate persona
     print("Analyzing user data and generating persona...")
     persona = generator.analyze_persona(user_info)
     
-    # Save to file
     filename = f"reddit_persona_{username}.txt"
     generator.generate_persona_file(persona, filename)
     
